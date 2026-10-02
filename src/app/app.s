@@ -585,6 +585,8 @@ FN app_close_tab_now
 11: mov rdi, rbx
     call vim_forget
     mov rdi, rbx
+    call pad_discard              # an empty untitled note's file goes with it
+    mov rdi, rbx
     call doc_free
 1:  # remove slot
     mov rcx, r12
@@ -617,14 +619,19 @@ FN app_close_tab_now
     call app_update_title
     EPILOGUE
 
-# app_close_tab(i): ask when modified
+# app_close_tab(i): ask when modified; an empty untitled note just goes away
 FN app_close_tab
     PROLOGUE
     mov rbx, rdi
     call tab_at
     cmp qword ptr [rax + TAB_kind], TAB_DOC
     jne 1f
-    mov rdi, [rax + TAB_doc]
+    mov r13, [rax + TAB_doc]
+    mov rdi, r13
+    call pad_scratch
+    test eax, eax
+    jnz 1f                         # nothing in it, no name kept: no question
+    mov rdi, r13
     call doc_dirty
     test eax, eax
     jz 1f
@@ -741,7 +748,12 @@ FN cmd_quit
     call tab_at
     cmp qword ptr [rax + TAB_kind], TAB_DOC
     jne 2f
-    mov rdi, [rax + TAB_doc]
+    mov r13, [rax + TAB_doc]
+    mov rdi, r13
+    call pad_scratch
+    test eax, eax
+    jnz 2f                         # an empty untitled note: no question
+    mov rdi, r13
     call doc_dirty
     test eax, eax
     jz 2f

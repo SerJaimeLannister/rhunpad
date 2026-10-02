@@ -402,6 +402,10 @@ FN session_save
     jz 2f
     cmp qword ptr [r12 + DOC_path], 0
     je 2f
+    mov rdi, r12
+    call pad_discard               # an empty untitled note goes away, not into the session
+    test eax, eax
+    jnz 2f
     cmp rbx, [rip + g_tab_cur]
     jne 11f
     lea rdi, [rip + out]

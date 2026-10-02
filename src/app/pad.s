@@ -37,6 +37,7 @@ pad_first: .long 0                # the first note still waits on the folder cho
 pad_asked: .long 0                # the picker opened on its own once already
 pad_nosave: .long 0               # apply the new folder without writing it to the config
 .globl pad_new_note, cmd_pick_welcome
+.globl pad_scratch, pad_discard
 
 .text
 
@@ -632,6 +633,10 @@ FN pad_materialize
     test eax, eax
     jnz 2f                        # a modified note: the save flow handles it
     mov rdi, rbx
+    call doc_len
+    test rax, rax
+    jz 2f                          # empty: it goes away when it closes
+    mov rdi, rbx
     call pad_assign
     test eax, eax
     jz 2f
@@ -815,6 +820,65 @@ FN pad_new_note
     jmp 9f
 1:  mov dword ptr [rip + g_save_state], 3
 9:  EPILOGUE
+
+# pad_scratch(doc) -> 1: an untitled note of the pad's, still empty
+FN pad_scratch
+    PROLOGUE 4104
+    mov rbx, rdi
+    cmp qword ptr [rbx + DOC_path], 0
+    je 9f
+    test dword ptr [rbx + DOC_flags], DF_READONLY
+    jnz 9f
+    call pad_home
+    test rax, rax
+    jz 9f
+    mov r12, rax
+    mov rsi, [rip + g_project]
+    test rsi, rsi
+    jz 9f
+    mov rdi, r12
+    call strcmp_eq
+    test eax, eax
+    jz 9f                          # not the pad's project
+    lea rdi, [rsp]
+    mov rsi, r12
+    call cstr_copy
+    mov rdi, rax
+    lea rsi, [rip + .Luntitled]
+    call cstr_copy
+    sub rax, rsp                   # the prefix's length
+    mov r13, rax
+    mov rdi, [rbx + DOC_path]
+    call strlen
+    mov rsi, rax
+    lea rdx, [rsp]
+    mov rcx, r13
+    mov rdi, [rbx + DOC_path]
+    call str_starts
+    test eax, eax
+    jz 9f                          # not an untitled-N note of the home
+    mov rdi, rbx
+    call doc_len
+    test rax, rax
+    jnz 9f                         # something was written: it stays
+    mov eax, 1
+    EPILOGUE
+9:  xor eax, eax
+    EPILOGUE
+
+# pad_discard(doc) -> 1: an empty untitled note's file goes away with it
+FN pad_discard
+    PROLOGUE
+    mov rbx, rdi
+    call pad_scratch
+    test eax, eax
+    jz 9f
+    mov rdi, [rbx + DOC_path]
+    SYS SYS_unlink
+    mov eax, 1
+    EPILOGUE
+9:  xor eax, eax
+    EPILOGUE
 
 # app_autosave(): save every modified file with a path, quietly (cfg_autosave)
 FN app_autosave

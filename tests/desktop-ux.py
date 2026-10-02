@@ -48,12 +48,11 @@ with tempfile.TemporaryDirectory(prefix='rhunpad-desktop-') as temporary:
         assert 'project=~/rhunpad\n' in output, output
         assert f'tabs={tabs}' in output, output
 
-    # A fresh start is the pad: its home exists and a first note is open in it, on disk already.
+    # A fresh start is the pad: its home exists and a first note is open in it, named and ready.
     output = run()
     check_pad(output)
     assert (work / 'rhunpad').is_dir()
     assert 'active=untitled-1.md ' in output, output
-    assert (work / 'rhunpad/untitled-1.md').exists(), 'first note file'
     print('ok   desktop/fresh-start-is-the-pad')
 
     # Notes are plain files the user owns: typed text names itself untitled-1.md at its first
