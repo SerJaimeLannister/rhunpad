@@ -14,7 +14,7 @@ run() {
     shift
     printf '%s\n' "$@" > "$w/$n.rsc"
     HOME="$w" XDG_CONFIG_HOME="$w/c" XDG_STATE_HOME="$w/s" \
-        build/rhun "$at" --headless 800x600 --script "$w/$n.rsc" > "$w/$n" 2>&1
+        build/rhunpad "$at" --headless 800x600 --script "$w/$n.rsc" > "$w/$n" 2>&1
 }
 fresh() { rm -rf "$w/p" "$w/s" "$w/c"; mkdir -p "$w/p"; for f in a b c; do echo "$f" > "$w/p/$f.txt"; done; }
 check() { # NAME EXPECTED [FOLDER]: the state the next start in FOLDER ($w/p) brings back

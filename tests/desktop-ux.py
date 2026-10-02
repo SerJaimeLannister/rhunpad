@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
-EXE = Path(os.environ.get('RHUN_TEST_EXE', ROOT / 'build/rhun')).resolve()
+EXE = Path(os.environ.get('RHUN_TEST_EXE', ROOT / 'build/rhunpad')).resolve()
 
 with tempfile.TemporaryDirectory(prefix='rhunpad-desktop-') as temporary:
     work = Path(temporary).resolve()

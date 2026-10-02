@@ -421,7 +421,12 @@ open_initial:
     jz 6f
     call pad_startup
     jmp 6f
-52: mov edi, 1
+52: call pad_folder_gone
+    test eax, eax
+    jz 53f
+    lea rdi, [rip + .Lfolder_gone]
+    call app_toast
+53: mov edi, 1
     call cmd_pick_folder
 6:  call app_update_title
     mov dword ptr [rip + g_started], 1
@@ -430,6 +435,7 @@ open_initial:
 .section .rodata
 .Ltitle: .asciz "rhunpad"
 .Lno_display: .asciz "rhunpad: no Wayland or X11 display found"
+.Lfolder_gone: .asciz "The notes folder is not there anymore; choose it again"
 .Lenv_backend: .asciz "RHUN_BACKEND"
 .Lenv_scale: .asciz "RHUN_SCALE"
 .Lo_headless: .asciz "--headless"

@@ -117,7 +117,7 @@ class CommitAI(unittest.TestCase):
                                       '[files]\nautosave = false\n[updates]\ncheck = false\n'
                                       '[git]\ncommit_ai = '+provider+'\ncommit_model = '+model+'\n')
         script = self.w/'test.rsc'; script.write_text('\n'.join(lines)+'\n')
-        return subprocess.run([str(ROOT/'build/rhun'),str(self.repo),'--headless','1400x860','--script',str(script)],
+        return subprocess.run([str(ROOT/'build/rhunpad'),str(self.repo),'--headless','1400x860','--script',str(script)],
                               env=dict(self.env,**env),capture_output=True,text=True,timeout=35)
 
     def test_off(self):

@@ -8,7 +8,7 @@ import tempfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-EXE = Path(os.environ.get('RHUN_TEST_EXE', str(ROOT/'build/rhun'))).resolve()
+EXE = Path(os.environ.get('RHUN_TEST_EXE', str(ROOT/'build/rhunpad'))).resolve()
 
 class PaletteScroll(unittest.TestCase):
     def setUp(self):

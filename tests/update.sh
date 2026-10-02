@@ -33,7 +33,7 @@ run() {
     printf '%s\n' "$@" > "$w/$c.rsc"
     env HOME="$w/home" XDG_CONFIG_HOME="$w/config" XDG_STATE_HOME="$w/state" \
         RHUN_RELEASES_URL="file://$w/rel" RHUN_UPDATE_TARGET="$target" STUB_LOG="$w/stub.log" STUB_FAIL="$stubfail" \
-        build/rhun "$w/proj" --headless 800x600 --script "$w/$c.rsc" > "$w/$c.out" 2>&1
+        build/rhunpad "$w/proj" --headless 800x600 --script "$w/$c.rsc" > "$w/$c.out" 2>&1
 }
 expect() { # CASE LINE
     if grep -qxF "$2" "$w/$1.out"; then echo "ok   update/$1"; else echo "FAIL update/$1"; cat "$w/$1.out"; fail=1; fi

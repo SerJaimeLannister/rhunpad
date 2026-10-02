@@ -36,7 +36,7 @@ FN os_map
     jmp die
 
 .section .rodata
-.Loom: .asciz "rhun: out of memory"
+.Loom: .asciz "rhunpad: out of memory"
 .text
 
 # mem_alloc(size) -> ptr

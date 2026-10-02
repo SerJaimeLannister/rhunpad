@@ -27,7 +27,7 @@ printf 'FROM debian:stable-slim\nRUN apt-get update && apt-get install -y --no-i
 mkdir -p "$work/src"
 rsync -a --exclude build --exclude .git ./ "$work/src/"
 docker run --rm --platform linux/amd64 -v "$work/src:/src" -w /src rhun-linux-ref ./build.sh >/dev/null
-cp "$work/src/build/rhun" "$work/rhun-x86_64"
+cp "$work/src/build/rhunpad" "$work/rhun-x86_64"
 rm -rf "$work/src/build"
 
 # the sessions, each in a fresh copy of the tree at the same path

@@ -48,7 +48,7 @@ for s in tests/scripts/*.rsc; do
     fi
     status=0
     XDG_CONFIG_HOME=$tmp/config-$n XDG_STATE_HOME=$tmp/state-$n HOME=$home XCOMPOSEFILE=$PWD/tests/data/compose.txt XCURSOR_PATH=tests/data/icons XCURSOR_THEME=child SHELL=$shell PS1='$ ' \
-        limit 20 build/rhun "$@" --headless 1400x860 --script "$tmp/$n.rsc" > "$tmp/$n.out" 2>&1 || status=$?
+        limit 20 build/rhunpad "$@" --headless 1400x860 --script "$tmp/$n.rsc" > "$tmp/$n.out" 2>&1 || status=$?
     if [ "$status" != 0 ]; then
         echo "FAIL ui/$n (exit $status)"; fail=1
         continue

@@ -49,18 +49,18 @@ link() { # out objs...
     out=$1; shift
     clang -arch arm64 -mmacosx-version-min=$MINOS -o "$out" "$@" $LIBS
 }
-link build/rhun $objs
-[ "$1" = release ] && strip -x build/rhun
+link build/rhunpad $objs
+[ "$1" = release ] && strip -x build/rhunpad
 
-# build/rhun.app, signed ad hoc for this machine (tools/package-mac.sh signs for distribution)
-app=build/rhun.app/Contents
+# build/rhunpad.app, signed ad hoc for this machine (tools/package-mac.sh signs for distribution)
+app=build/rhunpad.app/Contents
 mkdir -p $app/MacOS $app/Resources
-# a new file, not rewritten in place: a running rhun keeps its code pages
-cp build/rhun $app/MacOS/rhun.new && mv -f $app/MacOS/rhun.new $app/MacOS/rhun
-[ -f assets/icons/rhun.icns ] && cp assets/icons/rhun.icns $app/Resources/rhun.icns
+# a new file, not rewritten in place: a running rhunpad keeps its code pages
+cp build/rhunpad $app/MacOS/rhunpad.new && mv -f $app/MacOS/rhunpad.new $app/MacOS/rhunpad
+[ -f assets/icons/rhun.icns ] && cp assets/icons/rhun.icns $app/Resources/rhunpad.icns
 # the bundle versions are numbers only: a prerelease suffix (-rc1) is left out
 sed "s/@VERSION@/$(sed "s/-.*//" VERSION)/" assets/mac/Info.plist > $app/Info.plist
-codesign -s - -f build/rhun.app 2>/dev/null
+codesign -s - -f build/rhunpad.app 2>/dev/null
 if [ "$1" = test ]; then
     lib=$(echo $objs | tr ' ' '\n' | grep -v 'src_main.o')
     for t in tests/*.s; do

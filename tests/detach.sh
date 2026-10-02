@@ -18,7 +18,7 @@ run() {
     shift 2
     st=0
     env -u DISPLAY -u WAYLAND_DISPLAY HOME="$w" XDG_CONFIG_HOME="$w/c" XDG_STATE_HOME="$w/s" \
-        XDG_RUNTIME_DIR="$w" "$@" script -qec "build/rhun $args $w" /dev/null > "$w/$n" 2>&1 || st=$?
+        XDG_RUNTIME_DIR="$w" "$@" script -qec "build/rhunpad $args $w" /dev/null > "$w/$n" 2>&1 || st=$?
 }
 check() { # NAME WHAT CMD...
     n=$1 what=$2

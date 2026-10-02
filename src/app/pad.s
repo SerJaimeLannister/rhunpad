@@ -5,7 +5,7 @@
 
 # A debug build asks for the notes folder at every start and keeps the choice for the
 # session only; a release build (0) asks once and stores it in the config
-.equ PAD_DEBUG, 1
+.equ PAD_DEBUG, 0
 
 .bss
 .p2align 3
@@ -38,6 +38,7 @@ pad_asked: .long 0                # the picker opened on its own once already
 pad_nosave: .long 0               # apply the new folder without writing it to the config
 .globl pad_new_note, cmd_pick_welcome
 .globl pad_scratch, pad_discard
+.globl pad_folder_gone
 
 .text
 
@@ -396,9 +397,11 @@ FN pad_home
     mov rdi, rax
     lea rsi, [rip + .Lpad_dir]
     call cstr_copy
-4:  lea rdi, [rip + home_buf]
-    call mkdir_p
+4:  test r12d, r12d
+    jz 41f                        # a chosen folder is never silently recreated
     lea rdi, [rip + home_buf]
+    call mkdir_p
+41: lea rdi, [rip + home_buf]
     call file_is_dir
     test eax, eax
     jz 9f
@@ -879,6 +882,24 @@ FN pad_discard
     EPILOGUE
 9:  xor eax, eax
     EPILOGUE
+
+# pad_folder_gone() -> 1: a configured notes folder is no longer there
+FN pad_folder_gone
+.if PAD_DEBUG == 0
+    mov rax, [rip + cfg_pad_folder]
+    test rax, rax
+    jz 9f
+    cmp byte ptr [rax], 0
+    je 9f
+    mov rdi, rax
+    call file_is_dir
+    test eax, eax
+    jz 8f
+.endif
+9:  xor eax, eax
+    ret
+8:  mov eax, 1
+    ret
 
 # app_autosave(): save every modified file with a path, quietly (cfg_autosave)
 FN app_autosave
