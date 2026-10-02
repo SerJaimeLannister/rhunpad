@@ -20,6 +20,10 @@ shell=/bin/sh
 [ "$(uname -s)" = Darwin ] && shell=/bin/dash
 for s in tests/scripts/*.rsc; do
     n=$(basename "$s" .rsc)
+    # the interface these scripts drive: rhun's editor behavior, whatever rhunpad defaults to out
+    # of the box; autosave stays off so scripts own every write, the agents tests need the panel
+    mkdir -p "$tmp/config-$n/rhunpad"
+    printf '%s\n' '[ui]' 'agents_panel = true' '[files]' 'autosave = false' > "$tmp/config-$n/rhunpad/config"
     # tests/data/NAME.home: a HOME of its own; @HOME@ in the script names it
     home=$tmp
     if [ -d "tests/data/$n.home" ]; then
@@ -33,11 +37,18 @@ for s in tests/scripts/*.rsc; do
         sh "tests/data/$n.setup" "$home" "$tmp/state-$n" > /dev/null
     fi
     sed "s|@HOME@|$home|g" "$s" > "$tmp/$n.rsc"
-    # "# start: FOLDER" in the script: rhun starts in that folder rather than in the repository
+    # "# start: FOLDER" in the script: rhun starts in that folder rather than in the repository;
+    # "# start: none": no folder at all, the scratchpad home
     start=$(sed -n 's/^# start: //p' "$tmp/$n.rsc")
+    set -- "$PWD"
+    if [ "$start" = none ]; then
+        set --
+    elif [ -n "$start" ]; then
+        set -- "$start"
+    fi
     status=0
     XDG_CONFIG_HOME=$tmp/config-$n XDG_STATE_HOME=$tmp/state-$n HOME=$home XCOMPOSEFILE=$PWD/tests/data/compose.txt XCURSOR_PATH=tests/data/icons XCURSOR_THEME=child SHELL=$shell PS1='$ ' \
-        limit 20 build/rhun "${start:-$PWD}" --headless 1400x860 --script "$tmp/$n.rsc" > "$tmp/$n.out" 2>&1 || status=$?
+        limit 20 build/rhun "$@" --headless 1400x860 --script "$tmp/$n.rsc" > "$tmp/$n.out" 2>&1 || status=$?
     if [ "$status" != 0 ]; then
         echo "FAIL ui/$n (exit $status)"; fail=1
         continue

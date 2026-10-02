@@ -18,7 +18,7 @@
 .equ ID_SPLIT_R, 0x2701
 .equ ID_DLG, 0x2800              # + button
 .equ ID_STATUS, 0x2900           # + item
-.equ RHUN_LEN, 5                 # bytes of "rhûn", the name on the welcome screen
+.equ RHUN_LEN, 7                 # bytes of "rhunpad", the name on the welcome screen
 .equ ID_WELCOME, 0x2a00          # + item
 
 .bss
@@ -42,6 +42,8 @@ dlg_title: .quad 0               # app_confirm: the question, a line under it, t
 dlg_text: .quad 0
 dlg_ok: .quad 0
 dlg_fn: .quad 0
+dlg_alt: .quad 0
+dlg_alt_fn: .quad 0
 switch_pending: .long 0          # a project switch waits on unsaved files
 switch_path: .zero 4096
 .p2align 3
@@ -836,13 +838,15 @@ FN app_on_scroll
 
 FN app_on_focus
     mov [rip + g_win_focused], edi
-    # files may have changed while away
+    # files may have changed while away; a pad saves before it can be forgotten
     test edi, edi
     jz 1f
     push rdi
     call git_touch
     pop rdi
-1:  call ed_touch
+    jmp 2f
+1:  call app_autosave
+2:  call ed_touch
     mov dword ptr [rip + g_dirty], 1
     ret
 
@@ -1261,6 +1265,7 @@ FN app_tick
     call git_tick
     call update_tick
     call ai_tick
+    call pad_tick
     EPILOGUE
 
 # ---------------- rendering ----------------
@@ -1305,9 +1310,13 @@ FN app_render
     xor edx, edx
     cmp dword ptr [rip + cfg_sidebar], 0
     je 1f
+    cmp dword ptr [rip + g_zen], 0
+    jne 1f
     mov edx, [rip + g_side_px]
 1:  cmp dword ptr [rip + cfg_agents], 0
     je 2f
+    cmp dword ptr [rip + g_zen], 0
+    jne 2f
     add edx, [rip + g_agents_px]
 2:  cmp edx, ecx
     jle 3f
@@ -1334,6 +1343,8 @@ FN app_render
     # sidebar
     cmp dword ptr [rip + cfg_sidebar], 0
     je 4f
+    cmp dword ptr [rip + g_zen], 0
+    jne 4f
     xor edi, edi
     mov esi, [rsp + 20]
     mov edx, [rip + g_side_px]
@@ -1355,6 +1366,8 @@ FN app_render
     call splitter
 4:  cmp dword ptr [rip + cfg_agents], 0
     je 5f
+    cmp dword ptr [rip + g_zen], 0
+    jne 5f
     mov edi, [rsp]
     sub edi, [rip + g_agents_px]
     mov [rsp + 32], edi
@@ -1373,10 +1386,12 @@ FN app_render
     mov edx, [rsp + 20]
     mov ecx, [rsp + 24]
     call splitter
-5:  # editor column, the terminal panel under it
+5:      # editor column, the terminal panel under it
     mov edi, [rsp + 28]
     cmp dword ptr [rip + cfg_sidebar], 0
     je 51f
+    cmp dword ptr [rip + g_zen], 0
+    jne 51f
     add edi, [rip + g_mt + 4*MI_1]
 51: mov [rsp + 40], edi
     mov eax, [rsp + 32]
@@ -1386,6 +1401,8 @@ FN app_render
     mov [rsp + 48], eax         # editor h
     cmp dword ptr [rip + g_term_open], 0
     je 52f
+    cmp dword ptr [rip + g_zen], 0
+    jne 52f
     mov edi, [rip + cfg_term_h]
     call sc
     M edx, MI_64
@@ -1407,6 +1424,8 @@ FN app_render
     call center_draw
     cmp dword ptr [rip + g_term_open], 0
     je 53f
+    cmp dword ptr [rip + g_zen], 0
+    jne 53f
     mov edi, [rsp + 40]
     mov esi, [rsp + 20]
     add esi, [rsp + 48]
@@ -1420,11 +1439,14 @@ FN app_render
     mov edx, [rsp]
     mov ecx, [rsp + 12]
     call titlebar_draw
+    cmp dword ptr [rip + g_zen], 0
+    jne 54f
     xor edi, edi
     mov esi, [rsp + 16]
     mov edx, [rsp]
     M ecx, MI_STATUS
     call statusbar_draw
+54:
     # overlays (not blocked)
     mov dword ptr [rip + g_block], 0
     call explorer_menu_draw
@@ -1586,8 +1608,11 @@ FN center_draw
     jne 1f
     call welcome_draw
     EPILOGUE
-1:  M eax, MI_TAB
-    mov [rsp + 16], eax
+1:  xor eax, eax                # distraction-free: no tab strip
+    cmp dword ptr [rip + g_zen], 0
+    jne 11f
+    M eax, MI_TAB
+11: mov [rsp + 16], eax
     mov edi, [rsp]
     mov esi, [rsp + 4]
     mov edx, [rsp + 8]
@@ -2356,7 +2381,28 @@ FN statusbar_draw
 1:  M esi, MI_12
     add esi, [rsp]
     mov [rsp + 16], esi
-    # vim: the command line in place of the position, else the mode and the keys typed so far
+    # the word count, after the position (rhunpad)
+    mov rdi, rbx
+    call doc_words
+    test rax, rax
+    jz 13f
+    push rax
+    lea rdi, [rip + tmp_sb]
+    lea rsi, [rip + .Lwords_sep]
+    call sb_push_cstr
+    lea rdi, [rip + tmp_sb]
+    pop rsi
+    push rsi
+    call sb_push_u64
+    lea rdi, [rip + tmp_sb]
+    pop rsi
+    lea rax, [rip + .Lword]
+    cmp rsi, 1
+    je 14f
+    lea rax, [rip + .Lwords]
+14: mov rsi, rax
+    call sb_push_cstr
+13: # vim: the command line in place of the position, else the mode and the keys typed so far
     cmp dword ptr [rip + cfg_vim], 0
     je 11f
     cmp dword ptr [rip + g_vim_cmdline], 0
@@ -2387,8 +2433,21 @@ FN statusbar_draw
     push rax
     call ui_text_v
     add rsp, 16
-12: # right side: language, indentation, eol, encoding
+12: # right side: save state, language, indentation, eol, encoding
     mov r12d, [rsp + 20]
+    cmp dword ptr [rip + g_save_state], 0
+    je .Lsb_after
+    lea r13, [rip + .Lsb_failed]
+    cmp dword ptr [rip + g_save_state], 3
+    je .Lsb_show
+    lea r13, [rip + .Lsb_saved]
+    mov rdi, rbx
+    call doc_dirty
+    test eax, eax
+    jnz .Lsb_after                 # typed on since: "Saved" would say too much
+.Lsb_show:
+    call .Lsb_item
+.Lsb_after:
     lea r13, [rip + .Lutf8]
     call .Lsb_item
     lea r13, [rip + .Llf]
@@ -2744,8 +2803,8 @@ FN dialog_draw
     # title
     lea rdi, [rip + tmp_sb]
     call sb_clear
-    cmp dword ptr [rip + dlg_kind], 4
-    jne 1f
+    cmp dword ptr [rip + dlg_kind], 3
+    jbe 1f
     lea rdi, [rip + tmp_sb]
     mov rsi, [rip + dlg_title]
     call sb_push_cstr
@@ -2778,8 +2837,8 @@ FN dialog_draw
     call ui_text_v_fit
     add rsp, 16
     lea r8, [rip + .Ldlg_msg]
-    cmp dword ptr [rip + dlg_kind], 4
-    jne 3f
+    cmp dword ptr [rip + dlg_kind], 3
+    jbe 3f
     mov r8, [rip + dlg_text]
 3:  mov [rsp + 16], r8
     mov rdi, r8
@@ -2818,12 +2877,16 @@ FN dialog_draw
     jae .Ldd_ret
     lea rax, [rip + dlg_labels]
     mov r13, [rax + rcx*8]
-    # a question: Cancel and its button
-    cmp dword ptr [rip + dlg_kind], 4
-    jne 0f
+    # a question or a choice: Cancel, an optional middle button, and the button on the right
+    cmp dword ptr [rip + dlg_kind], 3
+    jbe 0f
     cmp ecx, 1
-    je 4f
-    cmp ecx, 2
+    jne 41f
+    cmp dword ptr [rip + dlg_kind], 4
+    je 4f                        # a confirm has no middle button
+    mov r13, [rip + dlg_alt]
+    jmp 0f
+41: cmp ecx, 2
     jne 0f
     mov r13, [rip + dlg_ok]
 0:  mov rdi, r13
@@ -2891,7 +2954,7 @@ FN dialog_draw
 .Ldd_ret:
     EPILOGUE
 
-# dialog_choose(i): 0 cancel, 1 don't save, 2 save (or app_confirm's button)
+# dialog_choose(i): 0 cancel, 1 don't save, 2 save (or a question's buttons)
 dialog_choose:
     PROLOGUE
     mov ebx, edi
@@ -2899,10 +2962,20 @@ dialog_choose:
     mov dword ptr [rip + dlg_kind], 0
     mov dword ptr [rip + g_focus], FOCUS_EDITOR
     cmp r12d, 4
-    jne 0f
+    jne 10f
     cmp ebx, 2
     jne 9f
     call [rip + dlg_fn]
+    jmp 9f
+10: cmp r12d, 5
+    jne 0f
+    cmp ebx, 1
+    je 11f
+    cmp ebx, 2
+    jne 9f
+    call [rip + dlg_fn]
+    jmp 9f
+11: call [rip + dlg_alt_fn]
     jmp 9f
 0:  test ebx, ebx
     jz 8f
@@ -2957,6 +3030,20 @@ FN app_confirm
     mov [rip + dlg_ok], rdx
     mov [rip + dlg_fn], rcx
     mov dword ptr [rip + dlg_kind], 4
+    mov dword ptr [rip + g_focus], FOCUS_DIALOG
+    mov dword ptr [rip + g_dirty], 1
+    ret
+
+# app_choice(title cstr, line cstr, alt cstr, alt_fn, ok cstr, ok_fn): Cancel and two buttons; the
+#   ok button is the primary one (Return), alt the middle
+FN app_choice
+    mov [rip + dlg_title], rdi
+    mov [rip + dlg_text], rsi
+    mov [rip + dlg_alt], rdx
+    mov [rip + dlg_alt_fn], rcx
+    mov [rip + dlg_ok], r8
+    mov [rip + dlg_fn], r9
+    mov dword ptr [rip + dlg_kind], 5
     mov dword ptr [rip + g_focus], FOCUS_DIALOG
     mov dword ptr [rip + g_dirty], 1
     ret
@@ -3200,7 +3287,7 @@ FN cmd_move_line_down
     jmp ed_move_lines
 
 .section .rodata
-.Lrhun: .asciz "rh\303\273n"      # the name as it is written in the interface
+.Lrhun: .asciz "rhunpad"       # the name as it is written in the interface
 .Lempty: .asciz ""
 .Ldash: .asciz " \342\200\224 "
 .Lbinary: .asciz "Binary file, not opened"
@@ -3221,15 +3308,19 @@ FN cmd_move_line_down
 .Ltabs: .asciz "Tabs"
 .Lspaces: .asciz "Spaces: "
 .Lplain: .asciz "Plain Text"
+.Lwords_sep: .asciz " \342\200\242 "
+.Lword: .asciz " word"
+.Lsb_saved: .asciz "Saved"
+.Lsb_failed: .asciz "Save failed"
+.Lwords: .asciz " words"
 .Ldlg_q: .asciz "Save changes to "
 .Ldlg_msg: .asciz "Your changes will be lost if you don't save them."
 .Lnl: .ascii "\n"
-.Lw1: .asciz "Go to file"
+.Lw1: .asciz "Go to note"
 .Lw2: .asciz "Command palette"
-.Lw3: .asciz "New file"
+.Lw3: .asciz "New note"
 .Lw4: .asciz "Settings"
 .Lw5: .asciz "Toggle explorer"
-.Lw6: .asciz "Toggle agents"
 .Lw7: .asciz "Open file"
 .Lw8: .asciz "Open folder"
 .ifdef MACOS
@@ -3238,7 +3329,6 @@ FN cmd_move_line_down
 .Lk3: .asciz "\342\214\230N"
 .Lk4: .asciz "\342\214\230,"
 .Lk5: .asciz "\342\214\230B"
-.Lk6: .asciz "\342\207\247\342\214\230A"
 .Lk7: .asciz "\342\214\230O"
 .Lk8: .asciz "\342\207\247\342\214\230O"
 .else
@@ -3247,7 +3337,6 @@ FN cmd_move_line_down
 .Lk3: .asciz "Ctrl+N"
 .Lk4: .asciz "Ctrl+,"
 .Lk5: .asciz "Ctrl+B"
-.Lk6: .asciz "Ctrl+Shift+A"
 .Lk7: .asciz "Ctrl+O"
 .Lk8: .asciz "Ctrl+Shift+O"
 .endif
@@ -3266,7 +3355,6 @@ welcome_rows:
     .quad .Lw8, .Lk8, cmd_open_folder
     .quad .Lw4, .Lk4, cmd_settings
     .quad .Lw5, .Lk5, cmd_toggle_sidebar
-    .quad .Lw6, .Lk6, cmd_toggle_agents
     .quad 0
 dlg_labels: .quad .Ld0, .Ld1, .Ld2
 

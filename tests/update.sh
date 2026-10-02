@@ -26,9 +26,10 @@ run() {
     c=$1 reply=$2 seed=$3 target=$4 stubfail=$5
     shift 5
     rm -rf "$w/home" "$w/state" "$w/config" "$w/stub.log" "$w/restart.log"
-    mkdir -p "$w/home" "$w/state/rhun" "$w/config"
+    mkdir -p "$w/home" "$w/state/rhunpad" "$w/config/rhunpad"
+    printf '%s\n' '[updates]' 'check = true' '[files]' 'autosave = false' > "$w/config/rhunpad/config"
     if [ -n "$reply" ]; then printf '%s\n' "$reply" > "$w/rel/latest/download/VERSION"; else rm -f "$w/rel/latest/download/VERSION"; fi
-    [ -n "$seed" ] && printf '%s\n' "$seed" > "$w/state/rhun/update"
+    [ -n "$seed" ] && printf '%s\n' "$seed" > "$w/state/rhunpad/update"
     printf '%s\n' "$@" > "$w/$c.rsc"
     env HOME="$w/home" XDG_CONFIG_HOME="$w/config" XDG_STATE_HOME="$w/state" \
         RHUN_RELEASES_URL="file://$w/rel" RHUN_UPDATE_TARGET="$target" STUB_LOG="$w/stub.log" STUB_FAIL="$stubfail" \
@@ -55,7 +56,7 @@ expect fresh "state=available current=$cur latest=99.0.0 error="
 run stale 99.0.0 "checked=1
 latest=98.0.0" "$w/target" '' 'wait 5500' wait-update print-update
 expect stale "state=available current=$cur latest=99.0.0 error="
-if grep -qx 'latest=99.0.0' "$w/state/rhun/update"; then echo "ok   update/saved"; else echo "FAIL update/saved"; fail=1; fi
+if grep -qx 'latest=99.0.0' "$w/state/rhunpad/update"; then echo "ok   update/saved"; else echo "FAIL update/saved"; fail=1; fi
 # a build from source reports what it finds, never checks by itself, never installs
 run source 99.0.0 '' '' '' "$check" wait-update 'cmd install_update' wait-update print-update
 expect source "state=idle current=$cur latest=99.0.0 error="

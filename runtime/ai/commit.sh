@@ -13,7 +13,7 @@ repo=${RHUN_AI_REPO:-}
 # GUI launches often have a minimal PATH. Do not source shell startup files.
 PATH="${PATH:-/usr/bin:/bin}:$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/.bun/bin:/opt/homebrew/bin:/usr/local/bin:/Applications/Ollama.app/Contents/Resources:/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS"
 export PATH
-base=${XDG_DATA_HOME:-$HOME/.local/share}/rhun/ai
+base=${XDG_DATA_HOME:-$HOME/.local/share}/rhunpad/ai
 work=$(mktemp -d "${TMPDIR:-/tmp}/rhun-ai.XXXXXXXX") || fail 'Cannot create a private temporary directory.'
 server=
 transfer=

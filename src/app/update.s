@@ -1137,7 +1137,7 @@ ver_fields:
 .Lenv_state: .asciz "XDG_STATE_HOME"
 .Lenv_home: .asciz "HOME"
 .Llocal_state: .asciz "/.local/state"
-.Lstate_name: .asciz "/rhun/update"
+.Lstate_name: .asciz "/rhunpad/update"
 .Lk_checked: .asciz "checked"
 .Lk_latest: .asciz "latest"
 .Lk_checked_eq: .asciz "checked="

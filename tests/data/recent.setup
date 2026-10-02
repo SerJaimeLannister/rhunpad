@@ -3,7 +3,7 @@
 # "50/off", which its name meant before % had a name of its own, has a session too, the oldest
 set -e
 home=$1
-state=$2/rhun
+state=$2/rhunpad
 mkdir -p "$home/w" "$home/x" "$home/y" "$home/z" "$home/50%off" "$home/50/off" "$state"
 echo p > "$home/50%off/p.txt"
 echo s > "$home/50/off/s.txt"

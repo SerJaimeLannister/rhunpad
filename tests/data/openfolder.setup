@@ -2,7 +2,7 @@
 # sessions of some of them, the latest last: Gamma, notes, beta; the "gone" folder does not exist
 set -e
 home=$1
-state=$2/rhun
+state=$2/rhunpad
 mkdir -p "$home/work/alpha/src" "$home/work/beta" "$home/work/Gamma" "$home/notes" "$state"
 echo one > "$home/work/alpha/a.txt"
 echo two > "$home/work/alpha/src/b.c"

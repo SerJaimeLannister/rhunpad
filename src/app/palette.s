@@ -131,7 +131,13 @@ FN palette_close
     je 1f
     call theme_apply
 1:  call grep_release
-    mov dword ptr [rip + pal_mode], PM_NONE
+    # the notes folder picker: a cancel leaves the notes where they are
+    cmp dword ptr [rip + pal_mode], PM_BROWSE
+    jne 2f
+    cmp dword ptr [rip + brw_kind], 2
+    jne 2f
+    call pad_folder_cancel
+2:  mov dword ptr [rip + pal_mode], PM_NONE
     mov dword ptr [rip + g_focus], FOCUS_EDITOR
     mov dword ptr [rip + g_dirty], 1
     pop rbx
@@ -930,7 +936,9 @@ scan_cb:
 
 # ---- path browser ----
 
-# browse_open(folder): Open File (0) or Open Folder (1), starting in the project folder
+# browse_open(folder): Open File (0), Open Folder (1) or the notes folder picker (2), starting
+# in the project folder
+.globl browse_open
 browse_open:
     PROLOGUE
     mov ebx, edi
@@ -942,6 +950,9 @@ browse_open:
     test ebx, ebx
     jz 1f
     lea rax, [rip + .Lph_open_folder]
+    cmp ebx, 2
+    jne 1f
+    lea rax, [rip + .Lph_pick_folder]
 1:  mov [rip + pal_label], rax
     # the field: the project folder, the home folder as ~, and a '/'
     mov rsi, [rip + g_project]
@@ -1160,8 +1171,11 @@ browse_load:
     xor ebx, ebx                # items before the sorted ones
     cmp dword ptr [rip + brw_kind], 0
     je 1f
-    lea rdi, [rip + strings]
     lea rsi, [rip + .Lopen_here]
+    cmp dword ptr [rip + brw_kind], 2
+    jne 15f
+    lea rsi, [rip + .Lchoose_here]
+15: lea rdi, [rip + strings]
     call sb_push_cstr
     lea rdi, [rip + brw_label]
     lea rsi, [rip + brw_dir]
@@ -1977,7 +1991,7 @@ palette_accept:
 .Lpa_browse:
     call selected_item
     test rax, rax
-    jz .Lpa_ret
+    jz .Lpa_create
     mov r12, rax
     mov rax, [r12 + IT_data]
     test eax, BRW_HERE
@@ -2000,12 +2014,30 @@ palette_accept:
     call cstr_copy
     lea rdi, [rip + brw_next]
     call path_normalize
-    jmp .Lpa_switch
-.Lpa_here:
+    cmp dword ptr [rip + brw_kind], 2
+    jne .Lpa_switch
+    mov dword ptr [rip + pad_pick], 0
+    call palette_close
     lea rdi, [rip + brw_next]
+    call pad_folder_picked
+    jmp .Lpa_ret
+.Lpa_here:
+    cmp dword ptr [rip + brw_kind], 2
+    jne 5f
+    mov dword ptr [rip + pad_pick], 0
+    call palette_close
+    lea rdi, [rip + brw_dir]
+    call pad_folder_picked
+    jmp .Lpa_ret
+5:  lea rdi, [rip + brw_next]
     lea rsi, [rip + brw_dir]
     call cstr_copy
+    jmp .Lpa_switch
 .Lpa_switch:
+    call palette_close
+    lea rdi, [rip + brw_next]
+    call app_switch_project
+    jmp .Lpa_ret
     call palette_close
     lea rdi, [rip + brw_next]
     call app_switch_project
@@ -2020,6 +2052,32 @@ palette_accept:
     call app_open_path
     mov rdi, r13
     call mem_free
+    jmp .Lpa_ret
+.Lpa_create:
+    # the picker: Enter with nothing selected creates the folder the field names, and chooses it
+    cmp dword ptr [rip + brw_kind], 2
+    jne .Lpa_ret
+    call browse_split
+    test rcx, rcx
+    jz .Lpa_ret
+    lea rdi, [rip + brw_next]
+    mov rsi, rax
+    mov rdx, rcx
+    call browse_expand
+    lea rdi, [rip + brw_next]
+    call file_is_dir
+    test eax, eax
+    jnz 1f
+    lea rdi, [rip + brw_next]
+    call mkdir_p
+    lea rdi, [rip + brw_next]
+    call file_is_dir
+    test eax, eax
+    jz .Lpa_ret
+1:  mov dword ptr [rip + pad_pick], 0
+    call palette_close
+    lea rdi, [rip + brw_next]
+    call pad_folder_picked
     jmp .Lpa_ret
 .Lpa_close:
     call palette_close
@@ -2077,12 +2135,61 @@ prompt_done:
     jmp 9f
 3:  cmp r12d, PROMPT_RENAME
     jne 4f
+    # a name without a dot keeps the old extension (untitled-1.md -> ideas.md)
+    mov rdi, rbx
+    call strlen
+    mov rsi, rax
+    call path_basename           # rax the name, rdx its length
+    mov r13, rax
+    mov r14, rdx
+    xor ecx, ecx
+.Lrn_dot:
+    cmp rcx, r14
+    jae .Lrn_none
+    cmp byte ptr [r13 + rcx], '.'
+    je .Lrn_done
+    inc rcx
+    jmp .Lrn_dot
+.Lrn_none:
     lea rdi, [rip + g_explorer_target]
+    call strlen
+    mov rsi, rax
+    call path_basename
+    mov r13, rax
+    mov rcx, rdx
+.Lrn_back:
+    test rcx, rcx
+    jz .Lrn_done
+    cmp byte ptr [r13 + rcx - 1], '.'
+    je .Lrn_copy
+    dec rcx
+    jmp .Lrn_back
+.Lrn_copy:
+    mov rdi, rbx
+    call strlen
+    lea rdi, [rbx + rax]
+    lea rsi, [r13 + rcx - 1]
+    call cstr_copy
+.Lrn_done:
+    # a taken name never overwrites: rename(2) would replace silently
+    lea rdi, [rip + g_explorer_target]
+    mov rsi, rbx
+    call strcmp_eq
+    test eax, eax
+    jnz 31f
+    mov rdi, rbx
+    call file_mtime
+    test rax, rax
+    jz 30f
+    lea rdi, [rip + .Lname_taken]
+    call app_toast
+    jmp 9f
+30: lea rdi, [rip + g_explorer_target]
     mov rsi, rbx
     SYS SYS_rename
     test rax, rax
     js 8f
-    # retarget an open tab
+31: # retarget an open tab
     lea rdi, [rip + g_explorer_target]
     call app_find_tab
     test rax, rax
@@ -2561,6 +2668,9 @@ hint_text:
 .Lhint_delete: .asciz "Type yes and press Enter to delete"
 .Lph_open_file: .asciz "Open a file"
 .Lph_open_folder: .asciz "Open a folder"
+.Lph_pick_folder: .asciz "Choose the notes folder  (Enter creates the folder named)"
+.Lchoose_here: .asciz "Choose "
+.Lname_taken: .asciz "That name is taken"
 .Lopen_here: .asciz "Open "
 .Lroot: .asciz "/"
 .Lpp_none: .asciz "none\n"

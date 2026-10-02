@@ -12,6 +12,8 @@ run() {
     n=$1
     shift
     printf '%s\n' 'cmd toggle_agents' 'cmd new_file' "$@" quit > "$w/$n.rsc"
+    mkdir -p "$w/c/rhunpad"
+    printf '%s\n' '[ui]' 'agents_panel = true' '[files]' 'autosave = false' > "$w/c/rhunpad/config"
     HOME="$w" XDG_CONFIG_HOME="$w/c" XDG_STATE_HOME="$w/s" \
         build/rhun "$w/proj" --headless 800x600 --script "$w/$n.rsc" > "$w/$n" 2>&1
 }

@@ -1,4 +1,4 @@
-# settings: schema table, config file read/write (~/.config/rhun/config)
+# settings: schema table, config file read/write (~/.config/rhunpad/config)
 .include "rhun.inc"
 
 
@@ -9,10 +9,8 @@
 .globl cfg_line_numbers, cfg_highlight_line, cfg_indent_guides, cfg_cursor_blink, cfg_whitespace
 .globl cfg_sidebar, cfg_sidebar_w, cfg_agents, cfg_agents_w, cfg_ui_scale, cfg_final_newline
 .globl cfg_trim_trailing, cfg_scroll_past_end, cfg_smooth_caret, cfg_theme, cfg_font, cfg_ui_font
-.globl cfg_exclude, cfg_agent_sources, cfg_restore_session, cfg_auto_pairs, cfg_word_wrap, cfg_decorations
+.globl cfg_exclude, cfg_agent_sources, cfg_restore_session, cfg_auto_pairs, cfg_word_wrap, cfg_decorations, cfg_autosave
 .globl cfg_vim
-.globl cfg_restore_project
-cfg_restore_project: .long 0
 cfg_font_size: .long 14
 cfg_ui_font_size: .long 13
 cfg_line_height: .long 150
@@ -26,7 +24,7 @@ cfg_cursor_blink: .long 1
 cfg_whitespace: .long 0
 cfg_sidebar: .long 1
 cfg_sidebar_w: .long 240
-cfg_agents: .long 1
+cfg_agents: .long 0
 cfg_agents_w: .long 380
 cfg_ui_scale: .long 100
 cfg_final_newline: .long 1
@@ -45,8 +43,9 @@ cfg_term_h: .long 260
 cfg_git: .long 1
 .globl cfg_commit_ai, cfg_commit_model
 cfg_commit_ai: .long 0
-.globl cfg_update_check
-cfg_update_check: .long 1
+.globl cfg_update_check, cfg_autosave
+cfg_update_check: .long 0
+cfg_autosave: .long 1
 .p2align 3
 cfg_theme: .quad cfg_def_theme
 cfg_font: .quad .Lempty
@@ -55,6 +54,8 @@ cfg_exclude: .quad .Ldef_exclude
 cfg_agent_sources: .quad .Ldef_sources
 cfg_term_shell: .quad .Lempty
 cfg_commit_model: .quad .Ldefault_model
+.globl cfg_pad_folder
+cfg_pad_folder: .quad .Lempty
 
 .bss
 .p2align 3
@@ -69,7 +70,7 @@ dir_path: .quad 0
 
 .text
 
-# config_dir() -> "~/.config/rhun" (static)
+# config_dir() -> "~/.config/rhunpad" (static)
 FN config_dir
     push rbx
     lea rbx, [rip + cfg_dir_buf]
@@ -503,7 +504,7 @@ FN config_save
     mov rax, rbx
     EPILOGUE
 
-# config_dir_each(subdir, ext, cb): cb(path, name) for ~/.config/rhun/<subdir>/*<ext>
+# config_dir_each(subdir, ext, cb): cb(path, name) for ~/.config/rhunpad/<subdir>/*<ext>
 FN config_dir_each
     PROLOGUE 16
     mov [rip + dir_ext], rsi
@@ -560,11 +561,11 @@ cfg_def_theme: .asciz "rhun-dark"
 .Lhome: .asciz "HOME"
 .Ltmp: .asciz "/tmp"
 .Ldotconfig: .asciz "/.config"
-.Lrhun: .asciz "/rhun"
+.Lrhun: .asciz "/rhunpad"
 .Lslash_config: .asciz "/config"
 .Lkeys: .asciz "keys"
-.Lheader: .ascii "# rhun configuration. Also editable from Settings (ctrl+,).\n"
-          .asciz "# Changes are picked up while rhun is running.\n"
+.Lheader: .ascii "# rhunpad configuration. Also editable from Settings (ctrl+,).\n"
+          .asciz "# Changes are picked up while rhunpad is running.\n"
 .Lnl_bracket: .asciz "\n["
 .Lbracket_nl: .asciz "]\n"
 .Leq: .asciz " = "
@@ -637,8 +638,10 @@ g_settings:
     SETTING .Ls_editor, vim_mode, ST_BOOL, cfg_vim, 0, 1, 1, 0, "Vim mode", "Normal, insert and visual modes with vim keys."
     SETTING .Ls_files, trim_trailing_whitespace, ST_BOOL, cfg_trim_trailing, 0, 1, 1, 0, "Trim trailing whitespace", "Remove spaces at line ends when saving."
     SETTING .Ls_files, final_newline, ST_BOOL, cfg_final_newline, 0, 1, 1, 0, "Final newline", "Make sure saved files end with a newline."
-    SETTING .Ls_files, restore_session, ST_BOOL, cfg_restore_session, 0, 1, 1, 0, "Restore open files", "Reopen the files from the last session of a project."
-    SETTING .Ls_files, restore_project, ST_BOOL, cfg_restore_project, 0, 1, 1, 0, "Reopen last project", "Start in the last project when no file or folder is given."
+    SETTING .Ls_files, restore_session, ST_BOOL, cfg_restore_session, 0, 1, 1, 0, "Restore open notes", "Reopen the notes from the last session."
+    SETTING .Ls_files, autosave, ST_BOOL, cfg_autosave, 0, 1, 1, 0, "Autosave", "Save modified notes quietly every second."
+    SETTING .Ls_files, notes_folder, ST_STR, cfg_pad_folder, 0, 0, 0, 0, "Notes folder", "Where new notes are kept. Empty asks at the next start."
+    SETTING_ACTION .Ls_files, change_folder, cmd_change_folder, .Lbtn_change, g_pad_folder_desc
     SETTING .Ls_files, exclude, ST_STR, cfg_exclude, 0, 0, 0, 0, "Hidden in explorer", "Space separated names the explorer skips."
     SETTING .Ls_agents, sources, ST_STR, cfg_agent_sources, 0, 0, 0, 0, "Agent sources", "Which agents to show: claude, codex."
     SETTING .Ls_terminal, shell, ST_STR, cfg_term_shell, 0, 0, 0, 0, "Shell", "Program the terminal runs. Empty uses $SHELL."
@@ -658,3 +661,4 @@ g_settings:
 .Ldefault_model: .asciz "qwen2.5-coder:1.5b"
 .Lai_opts: .asciz "off", "Off", "claude", "Claude Code", "codex", "Codex", "ollama", "Local (Ollama)", ""
 .Lai_setup: .asciz "Local model files"
+.Lbtn_change: .asciz "Change Folder"

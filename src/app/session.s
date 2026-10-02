@@ -1,4 +1,4 @@
-# remembers the open files of a project (~/.local/state/rhun/<project path>.session)
+# remembers the open files of a project (~/.local/state/rhunpad/<project path>.session)
 .include "rhun.inc"
 
 .equ RECENT_MAX, 9
@@ -21,7 +21,7 @@ g_recent_label: .zero 4096 * RECENT_MAX
 
 .text
 
-# state_dir(sb) -> 1 with "$XDG_STATE_HOME/rhun" (or "$HOME/.local/state/rhun") in sb, created;
+# state_dir(sb) -> 1 with "$XDG_STATE_HOME/rhunpad" (or "$HOME/.local/state/rhunpad") in sb, created;
 # 0 without a home
 state_dir:
     PROLOGUE
@@ -385,6 +385,7 @@ FN session_save
     je 9f
     cmp dword ptr [rip + g_session_final], 0
     jne 9f
+    call pad_materialize        # empty untitled notes become files before they are recorded
     call session_file
     test rax, rax
     jz 9f
@@ -523,7 +524,7 @@ FN session_restore
 .Lstate: .asciz "XDG_STATE_HOME"
 .Lhome: .asciz "HOME"
 .Llocal_state: .asciz "/.local/state"
-.Lrhun_dir: .asciz "/rhun"
+.Lrhun_dir: .asciz "/rhunpad"
 .Lext: .asciz ".session"
 .Llast_project: .asciz "/last-project"
 .Lpercent: .asciz "%%25"

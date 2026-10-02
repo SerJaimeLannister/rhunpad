@@ -110,8 +110,12 @@ class CommitAI(unittest.TestCase):
     def calls(self):
         return [json.loads(x) for x in (self.w/'calls').read_text().splitlines()] if (self.w/'calls').exists() else []
     def native(self, lines, provider='claude', model='qwen2.5-coder:1.5b', **env):
-        config = self.w/'config/rhun'; config.mkdir(parents=True,exist_ok=True)
-        (config/'config').write_text('[git]\ncommit_ai = '+provider+'\ncommit_model = '+model+'\n[ui]\nagents_panel = false\n')
+        config = self.w/'config/rhunpad'; config.mkdir(parents=True,exist_ok=True)
+        (config/'config').write_text('[editor]\nfont_size = 14\nline_height = 150\nline_numbers = true\n'
+                                      'highlight_line = true\nindent_guides = true\nword_wrap = false\n'
+                                      '[ui]\nsidebar = true\nagents_panel = false\n'
+                                      '[files]\nautosave = false\n[updates]\ncheck = false\n'
+                                      '[git]\ncommit_ai = '+provider+'\ncommit_model = '+model+'\n')
         script = self.w/'test.rsc'; script.write_text('\n'.join(lines)+'\n')
         return subprocess.run([str(ROOT/'build/rhun'),str(self.repo),'--headless','1400x860','--script',str(script)],
                               env=dict(self.env,**env),capture_output=True,text=True,timeout=35)
@@ -257,7 +261,7 @@ class CommitAI(unittest.TestCase):
             deadline = time.monotonic()+10
             while not shot.exists() and time.monotonic()<deadline: time.sleep(0.01)
             if shot.exists():
-                (self.w/'config/rhun/config').write_text('[git]\ncommit_ai = ollama\ncommit_model = other:model\n')
+                (self.w/'config/rhunpad/config').write_text('[git]\ncommit_ai = ollama\ncommit_model = other:model\n')
         thread=threading.Thread(target=change); thread.start()
         try:
             r=self.native(['wait-git','wait-ai','cmd ai_delete','shot '+str(shot),'wait 1500',
@@ -291,18 +295,18 @@ class CommitAI(unittest.TestCase):
             RHUN_AI_ACTION='setup',ARCHIVE=str(archive),CHECKSUMS=str(sums)), capture_output=True,text=True,timeout=15)
 
     def test_install_and_recover_dead_lock(self):
-        lock = self.w/'data/rhun/ai/setup.lock'; lock.mkdir(parents=True)
+        lock = self.w/'data/rhunpad/ai/setup.lock'; lock.mkdir(parents=True)
         (lock/'pid').write_text('99999999\n')
         r = self.install_fixture(); self.assertEqual(r.returncode,0,r.stdout)
-        self.assertTrue((self.w/'data/rhun/ai/ollama/ready').exists())
-        self.assertTrue((self.w/'data/rhun/ai/ollama').is_symlink())
+        self.assertTrue((self.w/'data/rhunpad/ai/ollama/ready').exists())
+        self.assertTrue((self.w/'data/rhunpad/ai/ollama').is_symlink())
 
     def test_cancel_at_publication_preserves_runtime(self):
         link = self.bin/'ln'
         link.write_text('#!/bin/sh\n/bin/ln "$@" || exit $?\nkill -TERM "$PPID"\n')
         link.chmod(0o755)
         r = self.install_fixture(); self.assertEqual(r.returncode,130,r.stdout)
-        published = self.w/'data/rhun/ai/ollama'
+        published = self.w/'data/rhunpad/ai/ollama'
         self.assertTrue((published/'ready').exists())
         link.unlink()
         r = self.install_fixture(); self.assertEqual(r.returncode,0,r.stdout)
@@ -310,13 +314,13 @@ class CommitAI(unittest.TestCase):
     def test_install_checksum_failure(self):
         r = self.install_fixture(bad_checksum=True)
         self.assertNotEqual(r.returncode,0); self.assertIn('checksum mismatch',r.stdout)
-        self.assertFalse((self.w/'data/rhun/ai/ollama/ready').exists())
+        self.assertFalse((self.w/'data/rhunpad/ai/ollama/ready').exists())
 
     def test_concurrent_installs_publish_complete_runtime(self):
         # Prepare fixture files once before starting both copies of the real helper.
         r = self.install_fixture()
         self.assertEqual(r.returncode,0,r.stdout)
-        published = self.w/'data/rhun/ai/ollama'
+        published = self.w/'data/rhunpad/ai/ollama'
         published.unlink()
         env = dict(self.env, RHUN_AI_PROVIDER='ollama', RHUN_AI_ACTION='setup',
                    ARCHIVE=str(self.w/'ollama-darwin.tgz'), CHECKSUMS=str(self.w/'checksums'))
@@ -337,7 +341,7 @@ class CommitAI(unittest.TestCase):
 
     def test_darwin_runtime_library_layout(self):
         r=self.install_fixture(darwin_layout=True); self.assertEqual(r.returncode,0,r.stdout)
-        runtime=self.w/'data/rhun/ai/ollama/bin'
+        runtime=self.w/'data/rhunpad/ai/ollama/bin'
         self.assertTrue((runtime/'libggml.so').exists())
         self.assertTrue((runtime/'libggml-metal.dylib').exists())
 
@@ -346,7 +350,7 @@ class CommitAI(unittest.TestCase):
         uname.write_text('#!/bin/sh\ncase "$1" in -s) echo Linux;; -m) echo x86_64;; esac\n')
         uname.chmod(0o755)
         r = self.install_fixture(); self.assertEqual(r.returncode,0,r.stdout)
-        self.assertTrue((self.w/'data/rhun/ai/ollama/ready').exists())
+        self.assertTrue((self.w/'data/rhunpad/ai/ollama/ready').exists())
 
     def test_settings_do_not_wait_for_detection(self):
         start=time.monotonic()
@@ -359,10 +363,10 @@ class CommitAI(unittest.TestCase):
                        'click 874 442','wait-ai','print-ai'])
         self.assertEqual(r.returncode,0,r.stderr)
         self.assertIn('AI commit messages are off.',r.stdout)
-        self.assertIn('commit_ai = off',(self.w/'config/rhun/config').read_text())
+        self.assertIn('commit_ai = off',(self.w/'config/rhunpad/config').read_text())
 
     def test_external_config_change_cancels_generation(self):
-        config=self.w/'config/rhun/config'
+        config=self.w/'config/rhunpad/config'
         r=self.native(['wait-git','wait-ai','cmd git_generate_message','wait 100',
                        'open '+str(config),'key ctrl+a','type [git]','key Return',
                        'type commit_ai = off','key Return','cmd save','wait 300',

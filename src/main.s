@@ -88,6 +88,7 @@ FN main
 3:  call loop_run
 .Lm_exit:
     call ai_shutdown
+    call app_autosave
     call session_save
     cmp dword ptr [rip + g_settings_changed], 0
     je 4f
@@ -375,20 +376,21 @@ open_initial:
     mov r12d, 1
 11: inc rbx
     jmp 1b
-2:  test r12d, r12d
-    jnz 3f
-    # With no paths, optionally reopen the last project; explicit paths always win.
+2:  # no folder given: a fresh start opens the scratchpad home (rhunpad); explicit paths
+    # always keep the cwd as the project
+    xor r15d, r15d              # not a pad start
     cmp qword ptr [rip + paths + VEC_len], 0
     jne 21f
-    cmp dword ptr [rip + cfg_restore_project], 0
-    je 21f
-    call session_last_project
+    mov r15d, 1
+    call pad_home
     test rax, rax
     jz 21f
     mov rdi, rax
     call app_set_project
     jmp 3f
-21: # no folder given: the current directory is the project
+21: # a directory argument is the project; without one, the current directory is
+    test r12d, r12d
+    jnz 3f
     lea rdi, [rip + cwd]
     mov esi, 4096
     SYS SYS_getcwd
@@ -404,17 +406,30 @@ open_initial:
     call app_open_path
     inc rbx
     jmp 4b
-5:  # nothing opened: bring back the last session
+5:  # nothing opened: bring back the last session; an empty pad opens a first note
     cmp qword ptr [rip + g_tabs + VEC_len], 0
     jne 6f
-    call session_restore
+    test r15d, r15d
+    jz 51f
+    call pad_home
+    test rax, rax
+    jz 52f                     # no notes folder yet: the picker, and its choice continues
+51: call session_restore
+    cmp qword ptr [rip + g_tabs + VEC_len], 0
+    jne 6f
+    test r15d, r15d
+    jz 6f
+    call pad_startup
+    jmp 6f
+52: mov edi, 1
+    call cmd_pick_folder
 6:  call app_update_title
     mov dword ptr [rip + g_started], 1
     EPILOGUE
 
 .section .rodata
-.Ltitle: .asciz "rhun"
-.Lno_display: .asciz "rhun: no Wayland or X11 display found"
+.Ltitle: .asciz "rhunpad"
+.Lno_display: .asciz "rhunpad: no Wayland or X11 display found"
 .Lenv_backend: .asciz "RHUN_BACKEND"
 .Lenv_scale: .asciz "RHUN_SCALE"
 .Lo_headless: .asciz "--headless"
@@ -429,10 +444,11 @@ open_initial:
 .Lo_help: .asciz "--help"
 .Lo_h: .asciz "-h"
 .Lo_version: .asciz "--version"
-.Lversion: .asciz "rhun "
+.Lversion: .asciz "rhunpad "
 .Lnl: .asciz "\n"
-.Lusage: .ascii "usage: rhun [folder] [files...]\n"
-    .ascii "  --wait           stay in the terminal until rhun is closed (for EDITOR)\n"
+.Lusage: .ascii "usage: rhunpad [folder] [files...]\n"
+    .ascii "  without arguments, the scratchpad home (~/rhunpad) opens\n"
+    .ascii "  --wait           stay in the terminal until rhunpad is closed (for EDITOR)\n"
     .ascii "  --headless WxH   no display; use with --script or --control\n"
     .ascii "  --script FILE    run control commands from FILE and exit\n"
     .ascii "  --control PATH   accept control commands on a unix socket\n"

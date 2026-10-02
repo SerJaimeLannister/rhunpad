@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Startup project precedence and desktop actions, with isolated user state."""
+"""Startup project precedence and desktop actions, with isolated user state.
+
+rhunpad: without arguments the scratchpad home (~/rhunpad) opens, with a new untitled
+note when its own session has nothing open. Explicit folders and files win as before.
+"""
 import os
 from pathlib import Path
 import subprocess
@@ -9,7 +13,7 @@ import tempfile
 ROOT = Path(__file__).resolve().parent.parent
 EXE = Path(os.environ.get('RHUN_TEST_EXE', ROOT / 'build/rhun')).resolve()
 
-with tempfile.TemporaryDirectory(prefix='rhun-desktop-') as temporary:
+with tempfile.TemporaryDirectory(prefix='rhunpad-desktop-') as temporary:
     work = Path(temporary).resolve()
     project = work / 'project café with spaces'
     other = work / 'other'
@@ -17,15 +21,17 @@ with tempfile.TemporaryDirectory(prefix='rhun-desktop-') as temporary:
     other.mkdir()
     file = project / "file ' $test.txt"
     file.write_text('hello\n')
-    config = work / 'config/rhun/config'
+    config = work / 'config/rhunpad/config'
     config.parent.mkdir(parents=True)
     env = dict(os.environ, HOME=work.as_posix(), XDG_CONFIG_HOME=(work / 'config').as_posix(),
-               XDG_STATE_HOME=(work / 'state').as_posix())
+                XDG_STATE_HOME=(work / 'state').as_posix())
 
-    def configure(enabled=True, tabs=True):
-        config.write_text('[files]\nrestore_project = ' + str(enabled).lower() +
-                          '\nrestore_session = ' + str(tabs).lower() +
-                          '\n[updates]\ncheck = false\n[git]\nenabled = false\n')
+    def configure(tabs=True):
+        # the interface the click coordinates of this test are written for
+        config.write_text('[editor]\nfont_size = 14\nline_height = 150\n'
+                          '[ui]\nsidebar = true\nagents_panel = true\n'
+                          '[files]\nrestore_session = ' + str(tabs).lower() +
+                          '\nautosave = false\n[updates]\ncheck = false\n[git]\nenabled = false\n')
 
     def run(paths=(), lines=('print-project', 'print-state', 'quit')):
         script = work / 'commands.rsc'
@@ -38,42 +44,45 @@ with tempfile.TemporaryDirectory(prefix='rhun-desktop-') as temporary:
     def check_project(output, name):
         assert f'project=~/{name}\n' in output, output
 
-    configure()
-    run([project, file])
+    def check_pad(output, tabs='1 '):
+        assert 'project=~/rhunpad\n' in output, output
+        assert f'tabs={tabs}' in output, output
+
+    # A fresh start is the pad: its home exists and a new untitled note is open in it.
     output = run()
+    check_pad(output)
+    assert (work / 'rhunpad').is_dir()
+    assert 'active=untitled ' in output, output
+    print('ok   desktop/fresh-start-is-the-pad')
+
+    # Notes are plain files the user owns: typed text names itself untitled-1.md at its first
+    # autosave, and the pad's session brings it back with the same name.
+    run((), ['type pad note', 'wait 1500', 'quit'])
+    assert (work / 'rhunpad/untitled-1.md').read_text() == 'pad note\n', 'untitled note file'
+    output = run()
+    check_pad(output)
+    assert 'active=untitled-1.md ' in output, output
+    print('ok   desktop/pad-session-restored')
+
+    # Explicit folders and files always win.
+    check_project(run([other]), other.name)
+    run([project, file])
+    output = run([project])
     check_project(output, project.name)
     assert 'tabs=1 ' in output, output
-    print('ok   desktop/restore-project-and-tabs')
-
-    check_project(run([other]), other.name)
-    run([project])
-    check_project(run([file]), other.name)
     print('ok   desktop/explicit-folder-and-file-win')
 
     configure(tabs=False)
     run([project])
-    output = run()
+    output = run([project])
     check_project(output, project.name)
     assert 'tabs=0 ' in output, output
     print('ok   desktop/project-without-tab-restoration')
 
-    configure(enabled=False)
-    check_project(run(), other.name)
-    configure()
-    marker = work / 'state/rhun/last-project'
-    marker.write_text((work / 'missing').as_posix())
-    check_project(run(), other.name)
-    marker.write_text('')
-    check_project(run(), other.name)
-    marker.unlink()
-    check_project(run(), other.name)
-    print('ok   desktop/disabled-missing-empty-first-launch')
-
-    # A project switch is remembered immediately, including without saved tabs.
-    configure(tabs=False)
+    # After working elsewhere, a start without arguments is back at the pad.
     run([other], [f'open {project.as_posix()}', 'quit'])
-    check_project(run(), project.name)
-    print('ok   desktop/switched-project')
+    check_pad(run())
+    print('ok   desktop/back-to-the-pad')
 
     # Never open real desktop applications in the automated suite.
     if os.name != 'nt':
@@ -111,4 +120,4 @@ with tempfile.TemporaryDirectory(prefix='rhun-desktop-') as temporary:
         assert label in output, output
         expected = ['-R', directory.as_posix()] if sys.platform == 'darwin' else [project.as_posix()]
         assert log.read_text().splitlines() == expected, log.read_text()
-        print('ok   desktop/directory-context-menu-action')
+        print('ok   desktop/directory-menu')
