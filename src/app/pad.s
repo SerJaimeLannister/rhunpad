@@ -381,7 +381,9 @@ FN pad_home
     cmp byte ptr [rax], 0
     jne 5f
 .endif
-2:  # nothing chosen: headless scripts cannot pick a folder, so they get the default home
+2:  # nothing chosen: headless scripts cannot pick a folder, so they get the default home;
+    # everyone else has to choose first (an empty notes_folder is no choice either)
+    xor eax, eax
     cmp dword ptr [rip + g_headless], 0
     je 9f
     lea rdi, [rip + .Lhome]
@@ -481,14 +483,37 @@ FN pad_startup
 1:  mov edi, 1
     jmp cmd_pick_folder
 
-# cmd_pick_folder(first): the notes folder picker; first: the first note follows the choice
+# cmd_pick_folder(first): the notes folder picker; first: the first note follows the choice.
+# The platform's native dialog when it has one, the in-app browser otherwise
 FN cmd_pick_folder
+    PROLOGUE
+    mov ebx, edi
     mov dword ptr [rip + pad_pick], 1
     test edi, edi
     jz 1f
     mov dword ptr [rip + pad_first], 1
-1:  mov edi, 2
-    jmp browse_open
+1:  # the dialog opens at the configured folder, the home folder without one
+    mov rdi, [rip + cfg_pad_folder]
+    test rdi, rdi
+    jz 2f
+    cmp byte ptr [rdi], 0
+    jne 3f
+2:  xor edi, edi
+3:  PCALL P_pick_folder
+    cmp rax, -1
+    jne 4f
+    mov edi, 2                    # no native picker here: the in-app browser
+    call browse_open
+    EPILOGUE
+4:  test rax, rax
+    jz 5f
+    mov rbx, rax
+    mov rdi, rbx
+    call pad_folder_picked
+    mov rdi, rbx
+    call mem_free
+5:  call pad_folder_cancel        # cancelled: as the browser's cancel, the welcome row retries;
+    EPILOGUE                     # after a choice it only clears what pad_folder_picked left clear
 
 # cmd_change_folder(): Settings: choose a different notes folder
 FN cmd_change_folder

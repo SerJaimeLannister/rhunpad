@@ -98,7 +98,7 @@ FN mac_open_window
 2:  ldr x12, [x10, x11, lsl #3]
     str x12, [x9, x11, lsl #3]
     add x11, x11, #1
-    cmp x11, #13
+    cmp x11, #14
     b.lo 2b
     STW wzr, g_csd
     CLS x0, NSApplication
@@ -690,6 +690,80 @@ cursor_set:
     ret
 
 // p_clip_set(ptr, len)
+// p_pick_folder(start cstr or 0): a native dialog choosing the notes folder, opening at start
+// (the home folder without one). x8: a heap copy of the choice, 0 when cancelled, -1 when there
+// is no native picker here (headless: the in-app browser then)
+p_pick_folder:
+    XENTRY
+    LDW w9, g_headless
+    cbnz w9, 91f
+    mov x19, x0                 // the start folder, or 0
+    CLS x0, NSOpenPanel
+    MSG openPanel
+    mov x20, x0                 // the panel
+    mov x2, #1
+    MSG setCanChooseDirectories_
+    mov x0, x20
+    mov x2, #0
+    MSG setCanChooseFiles_
+    mov x0, x20
+    mov x2, #0
+    MSG setAllowsMultipleSelection_
+    cbz x19, 1f
+    mov x2, x19
+    CLS x0, NSString
+    MSG stringWithUTF8String_
+    b 2f
+1:  bl _NSHomeDirectory
+2:  mov x2, x0
+    mov x3, #1                  // is a directory
+    CLS x0, NSURL
+    MSG fileURLWithPath_isDirectory_
+    cbz x0, 3f
+    mov x2, x0
+    mov x0, x20
+    MSG setDirectoryURL_
+3:  ADR x0, s_pick_msg
+    mov x2, x0
+    CLS x0, NSString
+    MSG stringWithUTF8String_
+    mov x2, x0
+    mov x0, x20
+    MSG setMessage_
+    ADR x0, s_pick_prompt
+    mov x2, x0
+    CLS x0, NSString
+    MSG stringWithUTF8String_
+    mov x2, x0
+    mov x0, x20
+    MSG setPrompt_
+    mov x0, x20
+    MSG runModal
+    cmp x0, #1                  // NSModalResponseOK
+    b.ne 92f
+    mov x0, x20
+    MSG URLs
+    mov x20, x0
+    MSG count
+    cbz x0, 92f
+    mov x0, x20
+    mov x2, #0
+    MSG objectAtIndex_
+    MSG path
+    cbz x0, 92f
+    MSG UTF8String
+    cbz x0, 92f
+    mov x19, x0
+    bl _strlen
+    mov x1, x0
+    mov x0, x19
+    XCALL mem_dup
+    XLEAVE
+91: mov x8, #-1
+    XLEAVE
+92: mov x8, #0
+    XLEAVE
+
 p_clip_set:
     XENTRY
     mov x19, x0
@@ -1849,6 +1923,7 @@ plat_fns:
     .quad p_maximize
     .quad p_title
     .quad p_nop                 // P_menu
+    .quad p_pick_folder
 
 // CUR_* -> NSCursor class methods
 cursor_sels:
@@ -1966,6 +2041,8 @@ s_minimize: .asciz "Minimize"
 s_zoom: .asciz "Zoom"
 s_fullscreen: .asciz "Enter Full Screen"
 s_empty: .asciz ""
+s_pick_msg: .asciz "Choose the folder where rhunpad keeps your notes"
+s_pick_prompt: .asciz "Choose"
 s_h: .asciz "h"
 s_q: .asciz "q"
 s_m: .asciz "m"
@@ -2031,6 +2108,19 @@ DEFSEL setAppearance_, "setAppearance:"
 DEFSEL standardUserDefaults, "standardUserDefaults"
 DEFSEL stringForKey_, "stringForKey:"
 DEFSEL UTF8String, "UTF8String"
+DEFSEL openPanel, "openPanel"
+DEFSEL setCanChooseDirectories_, "setCanChooseDirectories:"
+DEFSEL setCanChooseFiles_, "setCanChooseFiles:"
+DEFSEL setAllowsMultipleSelection_, "setAllowsMultipleSelection:"
+DEFSEL setDirectoryURL_, "setDirectoryURL:"
+DEFSEL setMessage_, "setMessage:"
+DEFSEL setPrompt_, "setPrompt:"
+DEFSEL runModal, "runModal"
+DEFSEL URLs, "URLs"
+DEFSEL count, "count"
+DEFSEL objectAtIndex_, "objectAtIndex:"
+DEFSEL path, "path"
+DEFSEL fileURLWithPath_isDirectory_, "fileURLWithPath:isDirectory:"
 DEFSEL set, "set"
 DEFSEL arrowCursor, "arrowCursor"
 DEFSEL IBeamCursor, "IBeamCursor"
@@ -2067,8 +2157,6 @@ DEFSEL hasPreciseScrollingDeltas, "hasPreciseScrollingDeltas"
 DEFSEL removeTrackingArea_, "removeTrackingArea:"
 DEFSEL addTrackingArea_, "addTrackingArea:"
 DEFSEL initWithRect_options_owner_userInfo_, "initWithRect:options:owner:userInfo:"
-DEFSEL count, "count"
-DEFSEL objectAtIndex_, "objectAtIndex:"
 DEFSEL fileSystemRepresentation, "fileSystemRepresentation"
 DEFSEL initWithTitle_action_keyEquivalent_, "initWithTitle:action:keyEquivalent:"
 DEFSEL setKeyEquivalentModifierMask_, "setKeyEquivalentModifierMask:"
@@ -2150,6 +2238,8 @@ DEFCLS NSAttributedString
 DEFCLS NSEvent
 DEFCLS NSCursor
 DEFCLS NSPasteboard
+DEFCLS NSOpenPanel
+DEFCLS NSURL
 DEFCLS NSAppearance
 DEFCLS NSUserDefaults
 DEFCLS NSTrackingArea

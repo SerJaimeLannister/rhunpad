@@ -92,6 +92,10 @@ win_timeout:
 win_nop:
     ret
 
+win_pick_none:                    # no native picker: the in-app browser
+    mov rax, -1
+    ret
+
 win_draw:
     PROLOGUE 112
     mov eax, [rip + win_width]
@@ -760,6 +764,7 @@ FN win_reveal
 win_platform:
     .quad win_nop,win_timeout,win_nop,win_draw,win_set_cursor,win_clip_set,win_clip_get
     .quad win_nop,win_nop,win_minimize,win_maximize,win_title,win_nop
+    .quad win_pick_none
 .Lclass: .short 'r','h','u','n','W','i','n','d','o','w',0
 .Ltitle: .short 'r','h','u','n',0
 .Lopen: .short 'o','p','e','n',0

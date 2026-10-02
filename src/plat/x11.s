@@ -1242,6 +1242,8 @@ FN x_open_window
     mov [rip + g_plat + P_move], rax
     mov [rip + g_plat + P_resize], rax
     mov [rip + g_plat + P_menu], rax
+    lea rax, [rip + x_pick_none]
+    mov [rip + g_plat + P_pick_folder], rax
     lea rax, [rip + x_minimize]
     mov [rip + g_plat + P_minimize], rax
     lea rax, [rip + x_maximize]
@@ -1256,6 +1258,10 @@ FN x_open_window
     EPILOGUE
 
 x_nop:
+    ret
+
+x_pick_none:                       # no native picker: the in-app browser
+    mov rax, -1
     ret
 
 # x_timeout(): at once when the last frame asked for another, otherwise forever

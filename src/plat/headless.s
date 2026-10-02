@@ -42,6 +42,8 @@ FN headless_init
     mov [rip + g_plat + P_minimize], rax
     lea rax, [rip + hl_maximize]
     mov [rip + g_plat + P_maximize], rax
+    lea rax, [rip + hl_pick_none]
+    mov [rip + g_plat + P_pick_folder], rax
     mov dword ptr [rip + g_headless], 1
     mov dword ptr [rip + g_csd], 1
     mov edi, r12d
@@ -74,6 +76,10 @@ FN headless_resize
     ret
 
 hl_nop:
+    ret
+
+hl_pick_none:                       # no native picker: the in-app browser
+    mov rax, -1
     ret
 
 hl_move:

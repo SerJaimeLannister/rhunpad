@@ -1662,6 +1662,10 @@ wl_title:
     pop rbx
     ret
 
+wl_pick_none:                       # no native picker: the in-app browser
+    mov rax, -1
+    ret
+
 wl_menu:
     push rbx
     push r12
@@ -1983,6 +1987,8 @@ FN wl_open_window
     mov [rip + g_plat + P_title], rax
     lea rax, [rip + wl_menu]
     mov [rip + g_plat + P_menu], rax
+    lea rax, [rip + wl_pick_none]
+    mov [rip + g_plat + P_pick_folder], rax
     mov edi, [rip + wl_fd]
     mov esi, POLLIN
     lea rdx, [rip + wl_on_readable]

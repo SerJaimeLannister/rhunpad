@@ -13,6 +13,7 @@ oc_busy: .long 0                # running the client's lines
 oc_eof: .long 0                 # the client closed meanwhile
 addr: .zero 110
 .globl g_headless
+.p2align 2
 g_headless: .long 0
 
 .text

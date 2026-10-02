@@ -355,6 +355,7 @@ F P_minimize, 8         # ()
 F P_maximize, 8         # () toggle
 F P_title, 8            # (cstr)
 F P_menu, 8             # (x, y)
+F P_pick_folder, 8      # (start cstr or 0) -> heap cstr | 0 cancelled | -1 no native picker
 ENDSTRUCT PLAT_SIZE
 
 .equ EDGE_TOP, 1
