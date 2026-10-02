@@ -36,6 +36,7 @@ pad_pick: .long 0                 # the folder picker is open
 pad_first: .long 0                # the first note still waits on the folder choice
 pad_asked: .long 0                # the picker opened on its own once already
 pad_nosave: .long 0               # apply the new folder without writing it to the config
+.globl pad_new_note, cmd_pick_welcome
 
 .text
 
@@ -763,27 +764,57 @@ pad_move_cb:                       # (ctx, name, is_dir): one note across, never
     call mem_free
 9:  EPILOGUE
 
-# pad_folder_cancel(): the picker closed without a choice
+# pad_folder_cancel(): the picker closed without a choice: no folder, no note — the welcome
+# screen's row opens the picker again, as many times as wanted; cancellation is never a choice
 FN pad_folder_cancel
     cmp dword ptr [rip + pad_pick], 0
     je 9f
     mov dword ptr [rip + pad_pick], 0
-    cmp dword ptr [rip + pad_first], 0
-    je 9f
-    # a first start: the default home for this session, not written to the config
-    mov dword ptr [rip + pad_nosave], 1
-    lea rdi, [rip + .Lhome]
-    call getenv
+    mov dword ptr [rip + pad_first], 0
+    mov dword ptr [rip + pad_asked], 0
+9:  ret
+
+# cmd_pick_welcome(): the welcome screen and the command palette: the picker, the first note
+# follows the choice
+FN cmd_pick_welcome
+    mov edi, 1
+    jmp cmd_pick_folder
+
+# pad_new_note(i): a note just opened in the pad becomes a file right away, so it exists on
+# disk and keeps its name; elsewhere tabs stay unnamed until they are saved
+FN pad_new_note
+    PROLOGUE
+    mov rbx, rdi                  # the tab
+    call pad_home
     test rax, rax
     jz 9f
-    lea rdi, [rip + move_new]
-    mov rsi, rax
-    call cstr_copy
-    mov rdi, rax
-    lea rsi, [rip + .Lpad_dir]
-    call cstr_copy
-    jmp pad_apply_folder
-9:  ret
+    mov r12, rax
+    mov rsi, [rip + g_project]
+    test rsi, rsi
+    jz 9f
+    mov rdi, r12
+    call strcmp_eq
+    test eax, eax
+    jz 9f                          # not the pad's project
+    mov rdi, rbx
+    call tab_at
+    cmp qword ptr [rax + TAB_kind], TAB_DOC
+    jne 9f
+    mov rbx, [rax + TAB_doc]
+    cmp qword ptr [rbx + DOC_path], 0
+    jne 9f
+    mov rdi, rbx
+    call pad_assign
+    test eax, eax
+    jz 9f
+    mov rdi, rbx
+    call doc_save
+    test rax, rax
+    js 1f
+    mov dword ptr [rip + g_save_state], 2
+    jmp 9f
+1:  mov dword ptr [rip + g_save_state], 3
+9:  EPILOGUE
 
 # app_autosave(): save every modified file with a path, quietly (cfg_autosave)
 FN app_autosave

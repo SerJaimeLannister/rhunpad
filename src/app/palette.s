@@ -22,6 +22,7 @@
 .equ BRW_MAX, 20000             # entries of a folder in the path browser
 .equ BRW_DIR, 1                 # IT_data of the path browser: a folder
 .equ BRW_HERE, 2                # the "Open <folder>" row
+.equ BRW_UP, 4                  # the ".." row, a folder that goes up
 
 STRUCT
 F IT_label, 8
@@ -1090,18 +1091,22 @@ browse_filter:
 1:  lea r15, [r12 + r13]        # query
     sub r14, r13
     xor ebx, ebx
-    cmp qword ptr [rip + items + VEC_len], 0
-    je 2f
-    mov rax, [rip + items + VEC_ptr]
-    test qword ptr [rax + IT_data], BRW_HERE
-    jz 2f
+2:  cmp rbx, [rip + items + VEC_len]
+    jae 21f
+    imul rax, rbx, IT_SIZE
+    add rax, [rip + items + VEC_ptr]
+    mov rcx, [rax + IT_data]
+    and rcx, BRW_HERE | BRW_UP
+    test rcx, rcx
+    jz 21f                        # the leading rows: "Open <folder>" and ".." always show
     lea rdi, [rip + results]
     mov esi, RS_SIZE
     call vec_push
-    mov dword ptr [rax + RS_item], 0
+    mov [rax + RS_item], ebx
     mov dword ptr [rax + RS_score], 0
-    mov ebx, 1
-2:  mov [rsp], rbx              # leading rows
+    inc rbx
+    jmp 2b
+21: mov [rsp], rbx              # leading rows
 3:  cmp rbx, [rip + items + VEC_len]
     jae 5f
     imul r12, rbx, IT_SIZE
@@ -1193,6 +1198,24 @@ browse_load:
     mov ecx, BRW_HERE
     call item_add
     mov ebx, 1
+    cmp dword ptr [rip + brw_kind], 2
+    jne 1f
+    # the picker: ".." goes up a folder
+    mov r12, [rip + strings + SB_len]
+    lea rdi, [rip + strings]
+    lea rsi, [rip + .Lparent]
+    call sb_push_cstr
+    mov r13, [rip + strings + SB_len]
+    lea rdi, [rip + strings]
+    xor esi, esi
+    call sb_push_byte
+    mov edi, r12
+    mov rsi, r13
+    sub rsi, r12
+    xor edx, edx
+    mov ecx, BRW_UP | BRW_DIR
+    call item_add
+    inc ebx
 1:  lea rdi, [rip + brw_dir]
     lea rsi, [rip + browse_cb]
     xor edx, edx
@@ -2670,6 +2693,7 @@ hint_text:
 .Lph_open_folder: .asciz "Open a folder"
 .Lph_pick_folder: .asciz "Choose the notes folder  (Enter creates the folder named)"
 .Lchoose_here: .asciz "Choose "
+.Lparent: .asciz "../"
 .Lname_taken: .asciz "That name is taken"
 .Lopen_here: .asciz "Open "
 .Lroot: .asciz "/"

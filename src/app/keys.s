@@ -471,6 +471,7 @@ g_commands:
     COMMAND quick_open, "Go to File", cmd_quick_open, "ctrl+p ctrl+e"
     COMMAND command_palette, "Command Palette", cmd_command_palette, "ctrl+shift+p F1"
     COMMAND new_file, "New Note", cmd_new_file, "ctrl+n"
+    COMMAND pick_folder, "Choose Notes Folder", cmd_pick_welcome, "ctrl+t"
     COMMAND toggle_zen, "Toggle Distraction-Free Mode", cmd_toggle_zen, "F11 ctrl+alt+z"
     COMMAND save, "Save", cmd_save, "ctrl+s"
     COMMAND save_as, "Save As", cmd_save_as, "ctrl+shift+s"

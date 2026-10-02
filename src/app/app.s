@@ -567,7 +567,9 @@ FN cmd_new_file
     call doc_new
     mov rdi, rax
     mov esi, TAB_DOC
-    jmp app_add_tab
+    call app_add_tab
+    mov rdi, rax
+    jmp pad_new_note            # the pad: the note becomes a file right away
 
 # app_close_tab_now(i): close without asking
 FN app_close_tab_now
@@ -3321,6 +3323,7 @@ FN cmd_move_line_down
 .Lw3: .asciz "New note"
 .Lw4: .asciz "Settings"
 .Lw5: .asciz "Toggle explorer"
+.Lw6: .asciz "Choose notes folder"
 .Lw7: .asciz "Open file"
 .Lw8: .asciz "Open folder"
 .ifdef MACOS
@@ -3329,6 +3332,7 @@ FN cmd_move_line_down
 .Lk3: .asciz "\342\214\230N"
 .Lk4: .asciz "\342\214\230,"
 .Lk5: .asciz "\342\214\230B"
+.Lk6: .asciz "\342\214\230T"
 .Lk7: .asciz "\342\214\230O"
 .Lk8: .asciz "\342\207\247\342\214\230O"
 .else
@@ -3337,6 +3341,7 @@ FN cmd_move_line_down
 .Lk3: .asciz "Ctrl+N"
 .Lk4: .asciz "Ctrl+,"
 .Lk5: .asciz "Ctrl+B"
+.Lk6: .asciz "Ctrl+T"
 .Lk7: .asciz "Ctrl+O"
 .Lk8: .asciz "Ctrl+Shift+O"
 .endif
@@ -3351,6 +3356,7 @@ welcome_rows:
     .quad .Lw1, .Lk1, cmd_quick_open
     .quad .Lw2, .Lk2, cmd_command_palette
     .quad .Lw3, .Lk3, cmd_new_file
+    .quad .Lw6, .Lk6, cmd_pick_welcome
     .quad .Lw7, .Lk7, cmd_open_file
     .quad .Lw8, .Lk8, cmd_open_folder
     .quad .Lw4, .Lk4, cmd_settings
