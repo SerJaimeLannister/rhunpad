@@ -32,9 +32,10 @@ This produces `build/rhunpad` (the executable) and `build/rhunpad.app` (the app 
 ./install-macos.sh
 ```
 
-Installs `rhunpad.app` into `/Applications` when writable, otherwise into `~/Applications` (created if needed). An existing installation is replaced. Launch with:
+Installs `rhunpad.app` into `/Applications` when writable, otherwise into `~/Applications` (created if needed), and puts a `rhunpad` command in `~/.local/bin`. An existing installation is replaced. If `~/.local/bin` is not on your PATH, the installer prints how to add it (`fish_add_path ~/.local/bin` in fish). Launch with either:
 
 ```sh
+rhunpad                      # terminal command (starts the app)
 open /Applications/rhunpad.app
 ```
 
